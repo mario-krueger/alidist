@@ -2,37 +2,49 @@ package: OpenDataDetector
 version: "main"
 requires:
   - ROOT
+  - pythia
   - GEANT4
   - HepMC3
 build_requires:
   - "Clang:(?!osx)"
   - CMake
   - DD4Hep
+  - libjalienO2
+  - HepMC3
+  - RapidJSON
+  - libjalienO2
+  - boost
+  - Eigen3
+  - ninja
   - alibuild-recipe-tools
 source: https://gitlab.cern.ch/acts/OpenDataDetector.git
 ---
 #!/bin/bash -ex
 
-# cmake -S $SOURCEDIR -B ./  -DDD4hep_DIR=$HOME/alice/sw/SOURCES/DD4Hep/master/master/cmake/ -DGeant4_DIR=$GEANT4_ROOT -DROOT_DIR=$ROOTSYS -DCMAKE_CXX_STANDARD=17
-cmake -S $SOURCEDIR -B ./  -DDD4hep_DIR=$DD4HEP_ROOT -DGeant4_DIR=$GEANT4_ROOT -DROOT_DIR=$ROOTSYS -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=$INSTALLROOT
+# Configure out-of-source, installing into $INSTALLROOT
+cmake -S "$SOURCEDIR" -B ./ \
+    -DDD4hep_DIR="$DD4HEP_ROOT" \
+    -DGeant4_DIR="$GEANT4_ROOT" \
+    -DROOT_DIR="$ROOTSYS" \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_INSTALL_PREFIX="$INSTALLROOT"
 
-# cmake --build . -- ${JOBS:+-j$JOBS} install
+# Build
 cmake --build . -- ${JOBS:+-j$JOBS}
 
+cmake --install . --prefix "$INSTALLROOT"
 
-# cmake -S <path_to_source> -B <path_to_build_area>  -DDD4hep_DIR=<path_to_DD4hp> cmake -DGeant4_DIR=<path_to_Geant4> -DROOT_DIR=<path_to_ROOT> -DCMAKE_CXX_STANDARD=17
-# cmake --build <path_to_build_area>
+# Some systems put libs in lib64/
+[[ -d $INSTALLROOT/lib64 ]] && [[ ! -d $INSTALLROOT/lib ]] && ln -sf "$INSTALLROOT/lib64" "$INSTALLROOT/lib"
 
-
-[[ -d $INSTALLROOT/lib64 ]] && [[ ! -d $INSTALLROOT/lib ]] && ln -sf ${INSTALLROOT}/lib64 $INSTALLROOT/lib
-
-#ModuleFile
+# ModuleFile
 MODULEDIR="${INSTALLROOT}/etc/modulefiles"
 MODULEFILE="${MODULEDIR}/${PKGNAME}"
-mkdir -p ${MODULEDIR}
-alibuild-generate-module --bin --lib > "${MODULEFILE}"
+mkdir -p "${MODULEDIR}"
+alibuild-generate-module --bin --lib >"${MODULEFILE}"
+
 # extra environment
-cat >> ${MODULEFILE} <<EOF
+cat >>"${MODULEFILE}" <<EOF
 set ODD_ROOT \$::env(BASEDIR)/$PKGNAME/\$version
 setenv ODD_ROOT \$ODD_ROOT
 prepend-path ROOT_INCLUDE_PATH \$ODD_ROOT/include
